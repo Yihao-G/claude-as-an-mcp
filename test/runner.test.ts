@@ -127,6 +127,30 @@ describe("runner", () => {
     })
   })
 
+  it("applies the default model and effort to new sessions", async () => {
+    const { sdk, calls } = fakeSdk(scripted(init(), result()))
+    const run = createRunner({ cwd: tempDir(), defaults: { model: "opus", effort: "high" } }, sdk)
+
+    await run({ prompt: "Fix" })
+    await run({ prompt: "Fix", model: "sonnet", effort: "max" })
+
+    expect(calls[0]?.options).toMatchObject({ model: "opus", effort: "high" })
+    expect(calls[1]?.options).toMatchObject({ model: "sonnet", effort: "max" })
+  })
+
+  it("keeps a resumed session's model but applies the default effort", async () => {
+    const original = tempDir()
+    const { sdk, calls } = fakeSdk(scripted(init(), result()), { "session-9": { cwd: original } })
+    const run = createRunner({ cwd: tempDir(), defaults: { model: "opus", effort: "high" } }, sdk)
+
+    await run({ prompt: "Continue", sessionId: "session-9" })
+    await run({ prompt: "Continue", sessionId: "session-9", model: "sonnet" })
+
+    expect(calls[0]?.options).not.toHaveProperty("model")
+    expect(calls[0]?.options).toMatchObject({ resume: "session-9", effort: "high" })
+    expect(calls[1]?.options).toMatchObject({ resume: "session-9", model: "sonnet", effort: "high" })
+  })
+
   it("continues a session in the directory it was created in", async () => {
     const original = tempDir()
     const { sdk, calls } = fakeSdk(scripted(init({ session_id: "session-9" }), result({ session_id: "session-9" })), {

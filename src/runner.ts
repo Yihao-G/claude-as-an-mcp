@@ -52,8 +52,17 @@ export interface RunResult {
 }
 
 export type RunEvent =
-  | { type: "start"; cwd: string; resume?: string; prompt: string }
-  | { type: "init"; sessionId: string; model: string; permissionMode: string; cwd: string; version: string }
+  | { type: "start"; cwd: string; resume?: string; model?: string; effort?: EffortLevel; prompt: string }
+  | {
+      type: "init"
+      sessionId: string
+      model: string
+      /** The effort Claude Code reports it will use, after environment overrides; not every version reports it. */
+      effort?: string
+      permissionMode: string
+      cwd: string
+      version: string
+    }
   | { type: "fallback"; permissionMode: "acceptEdits" }
   | { type: "text"; text: string }
   | { type: "tool"; name: string; detail: string }
@@ -68,11 +77,20 @@ export interface RunOptions {
 
 export type Runner = (request: RunRequest, options?: RunOptions) => Promise<RunResult>
 
+export interface RunDefaults {
+  /** Model for new sessions; a resumed session keeps the model it was using. */
+  model?: string
+  /** Effort for every run, since a resumed session doesn't keep its effort. */
+  effort?: EffortLevel
+}
+
 export interface RunnerConfig {
   /** Directory new sessions run in unless a request names another. */
   cwd: string
   /** Claude Code executable to use instead of the one bundled with the SDK. */
   executable?: string
+  /** Used when a request doesn't set its own model or effort. */
+  defaults?: RunDefaults
 }
 
 export interface Sdk {
@@ -91,7 +109,9 @@ export function createRunner(config: RunnerConfig, sdk: Sdk = { query, getSessio
     if (signal?.aborted) return fail("Cancelled", request.sessionId)
     const cwd = await workingDirectory(request, config, sdk)
     if (cwd.error !== undefined) return fail(cwd.error, request.sessionId)
-    onEvent({ type: "start", cwd: cwd.path, resume: request.sessionId, prompt: request.prompt })
+    const model = request.model ?? (request.sessionId ? undefined : config.defaults?.model)
+    const effort = request.effort ?? config.defaults?.effort
+    onEvent({ type: "start", cwd: cwd.path, resume: request.sessionId, model, effort, prompt: request.prompt })
 
     const abortController = new AbortController()
     const abort = () => abortController.abort()
@@ -111,8 +131,8 @@ export function createRunner(config: RunnerConfig, sdk: Sdk = { query, getSessio
       abortController,
       stderr: (text) => onEvent({ type: "stderr", text }),
       ...(request.sessionId ? { resume: request.sessionId } : {}),
-      ...(request.model ? { model: request.model } : {}),
-      ...(request.effort ? { effort: request.effort } : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       ...(config.executable ? { pathToClaudeCodeExecutable: config.executable } : {}),
     }
 
@@ -130,6 +150,7 @@ export function createRunner(config: RunnerConfig, sdk: Sdk = { query, getSessio
           type: "init",
           sessionId: message.session_id,
           model: message.model,
+          effort: message.effort ?? undefined,
           permissionMode: message.permissionMode,
           cwd: message.cwd,
           version: message.claude_code_version,

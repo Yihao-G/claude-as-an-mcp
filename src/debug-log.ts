@@ -45,10 +45,16 @@ function pointLatestAt(directory: string, file: string) {
 
 function describe(event: RunEvent): string {
   switch (event.type) {
-    case "start":
-      return `start cwd=${event.cwd}${event.resume ? ` resume=${event.resume}` : ""}\nprompt: ${event.prompt}`
+    case "start": {
+      const options = [
+        event.resume && `resume=${event.resume}`,
+        event.model && `model=${event.model}`,
+        event.effort && `effort=${event.effort}`,
+      ].filter(Boolean)
+      return `start cwd=${event.cwd}${options.map((option) => ` ${option}`).join("")}\nprompt: ${event.prompt}`
+    }
     case "init":
-      return `init session=${event.sessionId} model=${event.model} mode=${event.permissionMode} cwd=${event.cwd} claude_code=${event.version}`
+      return `init session=${event.sessionId} model=${event.model}${event.effort ? ` effort=${event.effort}` : ""} mode=${event.permissionMode} cwd=${event.cwd} claude_code=${event.version}`
     case "fallback":
       return `auto mode unavailable, switched to ${event.permissionMode}`
     case "text":

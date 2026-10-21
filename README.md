@@ -62,8 +62,8 @@ OpenCode shows the tool as `claude_code`: the server key `claude` plus the tool 
 | `prompt` | Required. The task, or the next message when continuing a session. |
 | `session_id` | Continue that Claude Code session. It always runs in the directory it started in. |
 | `cwd` | Directory for a new session, relative to the project directory. Defaults to the project directory. |
-| `model` | Claude Code model alias or ID, such as `opus` or `sonnet`. Defaults to your Claude Code setting. |
-| `effort` | `low`, `medium`, `high`, `xhigh` or `max`. Defaults to your Claude Code setting. |
+| `model` | Claude Code model alias or ID, such as `opus` or `sonnet`. Defaults to [`model` in the config file](#configuration), then your Claude Code setting. |
+| `effort` | `low`, `medium`, `high`, `xhigh` or `max`. Defaults to [`effort` in the config file](#configuration), then your Claude Code setting. |
 
 The call blocks until Claude Code finishes, sending progress notifications every five seconds. Cancelling the call in OpenCode stops Claude Code. The result is a short header followed by Claude Code's final reply:
 
@@ -85,6 +85,26 @@ refused:
 - **Read-only work.** There's no read-only switch. For reviews, investigations and plans, the prompt tells Claude Code not to change anything; the tool description tells OpenCode's model to do this.
 - **Parallel runs.** Runs aren't queued. The tool description tells OpenCode not to run two tasks that may change files in the same directory at once.
 - **Sessions.** Every run is saved like any Claude Code session, so you can open one in a terminal with `claude --resume <session_id>` from its directory.
+
+## Configuration
+
+Optional defaults go in `~/.config/claude-as-an-mcp/config.json`, or `$XDG_CONFIG_HOME/claude-as-an-mcp/config.json` when that's set:
+
+```json
+{
+  "model": "opus",
+  "effort": "high"
+}
+```
+
+| Key | |
+| --- | --- |
+| `model` | Model for new sessions when a call doesn't name one. A continued session stays on the model it was using. |
+| `effort` | `low`, `medium`, `high`, `xhigh` or `max`, for every run when a call doesn't set one. Claude Code doesn't keep a session's effort when it's continued, so this applies to continuations too. |
+
+Without the file, Claude Code's own settings decide. On Opus 5.5 and newer models, a top-level `effortLevel` in your user settings doesn't count, so runs start at the model's default, which is `medium` on Opus 5.5. Set `effort` here, or save a per-model level under `modelSettings` in `~/.claude/settings.json`, which interactive sessions use too.
+
+The server reads the file when it starts, so restart OpenCode after editing it. If the file is invalid, the server doesn't start, and OpenCode shows the error. A `CLAUDE_CODE_EFFORT_LEVEL` environment variable overrides every other effort setting, including this file and the `effort` parameter.
 
 ## Authentication
 
